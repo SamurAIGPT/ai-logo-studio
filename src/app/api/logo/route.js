@@ -29,19 +29,25 @@ export async function POST(req) {
       return new NextResponse("Prompt is required", { status: 400 });
     }
 
-    // Cost logic: 18 credits for 1k and 2k, 36 credits for 4k resolution
-    const cost = resolution === "4k" ? 36 : 18;
+    const headerApiKey = req.headers.get("x-custom-api-key");
+    const customApiKey = headerApiKey || body.customApiKey || session.user.customApiKey || null;
+    const isUsingCustomKey = Boolean(customApiKey && customApiKey.trim().length > 0);
 
-    try {
-      await UserService.deductCredits(session.user.id, cost);
-    } catch (err) {
-      return new NextResponse("Insufficient credits", { status: 402 });
+    // Cost logic: 18 credits for 1k and 2k, 36 credits for 4k resolution (0 if custom API key active)
+    const cost = isUsingCustomKey ? 0 : (resolution === "4k" ? 36 : 18);
+
+    if (!isUsingCustomKey && cost > 0) {
+      try {
+        await UserService.deductCredits(session.user.id, cost);
+      } catch (err) {
+        return new NextResponse("Insufficient credits", { status: 402 });
+      }
     }
 
     // Select model based on whether user uploaded a reference image
     const modelType = inputImage ? "nano-banana-pro-edit" : "nano-banana-pro";
 
-    const apiKey = config.ai.apiKey;
+    const apiKey = isUsingCustomKey ? customApiKey.trim() : config.ai.apiKey;
     let resultImage = "";
     let requestId = `mock_${Date.now()}`;
     let status = "processing";

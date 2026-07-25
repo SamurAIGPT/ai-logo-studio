@@ -14,6 +14,10 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
+    const headerApiKey = req.headers.get("x-custom-api-key");
+    const customApiKey = headerApiKey || session.user.customApiKey || null;
+    const apiKey = (customApiKey && customApiKey.trim().length > 0) ? customApiKey.trim() : config.ai.apiKey;
+
     if (id) {
       let logo = await prisma.logoCreation.findFirst({
         where: { id, userId: session.user.id }
@@ -38,12 +42,12 @@ export async function GET(req) {
               data: { status: "completed", resultImage: FALLBACK_LOGOS[modelType] }
             });
           }
-        } else if (config.ai.apiKey && !config.ai.apiKey.includes("your_") && logo.requestId) {
+        } else if (apiKey && !apiKey.includes("your_") && logo.requestId) {
           try {
             const pollRes = await fetch(`https://api.muapi.ai/api/v1/predictions/${logo.requestId}/result`, {
               headers: {
                 "Content-Type": "application/json",
-                "x-api-key": config.ai.apiKey
+                "x-api-key": apiKey
               }
             });
 
@@ -100,12 +104,12 @@ export async function GET(req) {
               l.status = "completed";
               l.resultImage = FALLBACK_LOGOS[modelType];
             }
-          } else if (config.ai.apiKey && !config.ai.apiKey.includes("your_") && l.requestId) {
+          } else if (apiKey && !apiKey.includes("your_") && l.requestId) {
             try {
               const pollRes = await fetch(`https://api.muapi.ai/api/v1/predictions/${l.requestId}/result`, {
                 headers: {
                   "Content-Type": "application/json",
-                  "x-api-key": config.ai.apiKey
+                  "x-api-key": apiKey
                 }
               });
 
